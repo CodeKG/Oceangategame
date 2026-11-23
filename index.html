@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#031629">
+<title>OCEAN GATE – Mission Titanic · V2</title>
+<style>
+:root{--cyan:#53dfff;--gold:#f3c64c;--panel:rgba(2,20,36,.92);--line:#1b7795}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#031629;color:#eafaff;font-family:system-ui,Arial,sans-serif}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.hud{position:fixed;top:8px;left:8px;right:8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;z-index:2;pointer-events:none}
+.panel{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 9px;box-shadow:0 3px 16px #0005}
+.panel small{display:block;color:#a5e7f5;font-size:10px;letter-spacing:.55px;white-space:nowrap}
+.value{font-size:clamp(14px,2.5vw,19px);font-weight:800;font-variant-numeric:tabular-nums}
+.bar{height:7px;background:#173647;border-radius:20px;margin-top:5px;overflow:hidden}
+.fill{height:100%;width:0%;background:#28d6b2;transition:width .12s}
+#depthBar{background:#35c8ff}#pressureBar{background:#ffb347}#hullBar{background:#4ce49a}#oxygenBar{background:#5de1ff}
+#status{color:#7df2b0}
+#warning{position:fixed;top:132px;left:50%;transform:translateX(-50%);max-width:92vw;padding:7px 12px;border-radius:9px;background:#32190ddd;border:1px solid #ffb34d;color:#ffe2a4;font-weight:900;font-size:clamp(11px,2vw,14px);text-align:center;z-index:3;text-shadow:0 2px 4px #000;pointer-events:none}
+#rangePanel{position:fixed;right:9px;top:145px;width:min(245px,44vw);background:#041d31eF;border:1px solid #247d9a;border-radius:10px;padding:8px 10px;z-index:2}
+#rangePanel strong{font-size:12px;color:#aeeeff}
+#rangeText{font-size:12px;font-weight:800;margin:4px 0}
+#rangeTrack{height:9px;border-radius:20px;background:#173647;overflow:hidden}
+#rangeFill{height:100%;width:17%;background:linear-gradient(90deg,#40e1b4,#f2c14e,#ff625c)}
+#mission{position:fixed;left:10px;bottom:145px;color:#d1f1ff;font-size:11px;text-shadow:0 2px 5px #000;z-index:2;max-width:45vw}
+#controls{position:fixed;left:8px;right:8px;bottom:8px;display:flex;justify-content:center;gap:6px;flex-wrap:wrap;z-index:4}
+button{border:1px solid #36bfe6;background:#06405a;color:#fff;border-radius:10px;padding:10px 12px;font-weight:850;font-size:12px;cursor:pointer;touch-action:none;box-shadow:0 2px 9px #0005}
+button:active{background:#0b7895;transform:translateY(1px)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.shop{position:fixed;left:8px;bottom:68px;z-index:4;display:flex;gap:5px;max-width:calc(100vw - 16px);overflow-x:auto;padding:4px;background:#031b2bdc;border:1px solid #1b7795;border-radius:11px}
+.shop button{white-space:nowrap;padding:8px 9px;font-size:11px}
+#shopTitle{align-self:center;color:#ffe39a;font-size:11px;font-weight:900;padding:0 4px;white-space:nowrap}
+#toast{position:fixed;left:50%;top:185px;transform:translateX(-50%);z-index:6;color:#fff;background:#052a40ed;border:1px solid #45cce9;border-radius:9px;padding:8px 12px;font-weight:800;font-size:12px;text-align:center;max-width:90vw;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}
+.overlay{position:fixed;inset:0;z-index:10;background:rgba(0,10,23,.95);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:20px;overflow:auto}
+.overlay h1{font-size:clamp(30px,7vw,58px);color:#54dcff;text-shadow:0 0 20px #007aff;margin:5px}
+.overlay h2{color:#ffd36d;margin:5px}
+.overlay p{max-width:620px;line-height:1.5;font-size:14px}
+.note{font-size:11px!important;color:#a5d9e9}
+.hidden{display:none!important}
+#endScreen{background:rgba(0,8,18,.52)}
+#endScreen h1{color:#fff}
+#startButton{font-size:16px;padding:14px 22px;background:#087493}
+@media(max-width:560px){
+ .hud{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;top:5px;left:5px;right:5px}
+ .panel{padding:5px 6px}.panel small{font-size:8px}.value{font-size:14px}.bar{height:5px}
+ #warning{top:117px}
+ #rangePanel{top:153px;width:48vw;padding:6px}
+ #rangePanel strong,#rangeText{font-size:10px}
+ #mission{bottom:154px;font-size:9px}
+ .shop{bottom:57px;left:4px;right:4px}
+ .shop button{font-size:10px;padding:7px}
+ #controls{bottom:4px;gap:4px}
+ #controls button{padding:9px 10px;font-size:10px}
+}
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Ocean Gate Mission Titanic Spiel"></canvas>
+<div class="hud">
+ <div class="panel"><small>📏 TAUCHTIEFE</small><div class="value" id="depth">0 m</div><div class="bar"><div class="fill" id="depthBar"></div></div></div>
+ <div class="panel"><small>🌡️ AUSSENDRUCK</small><div class="value" id="pressure">1 bar</div><div class="bar"><div class="fill" id="pressureBar"></div></div></div>
+ <div class="panel"><small>🪙 MÜNZEN</small><div class="value" id="coins">0</div><div class="bar"><div class="fill" id="coinBar"></div></div></div>
+ <div class="panel"><small>🛠️ RUMPFSTABILITÄT</small><div class="value" id="hull">100 %</div><div class="bar"><div class="fill" id="hullBar"></div></div></div>
+ <div class="panel"><small>🫧 SAUERSTOFF</small><div class="value" id="oxygen">100 %</div><div class="bar"><div class="fill" id="oxygenBar"></div></div></div>
+ <div class="panel"><small>🚨 SYSTEMSTATUS</small><div class="value" id="status">BEREIT</div><div class="bar"><div class="fill" id="statusBar"></div></div></div>
+</div>
+<div id="warning">⚠️ V2 WARNZENTRALE: SYSTEME BEREIT – TAUCHGANG STARTEN</div>
+<div id="rangePanel"><strong>GESCHÄTZTE MAXIMAL-TIEFE</strong><div id="rangeText">650 m / 3.800 m</div><div id="rangeTrack"><div id="rangeFill"></div></div></div>
+<div id="mission">MISSION TITANIC · V2<br>🪙 Münzen sammeln · Upgrades kaufen · 3.800 m erreichen</div>
+<div id="toast"></div>
+<div class="shop" aria-label="Upgrade-Werkstatt">
+ <span id="shopTitle">WERKSTATT · Münzen:</span>
+ <button data-upgrade="pressure">🛡️ Druckschutz <span id="lv-pressure">0</span> · <span id="cost-pressure">25</span>🪙</button>
+ <button data-upgrade="hull">🔩 Rumpf <span id="lv-hull">0</span> · <span id="cost-hull">20</span>🪙</button>
+ <button data-upgrade="oxygen">🫧 Sauerstoff <span id="lv-oxygen">0</span> · <span id="cost-oxygen">20</span>🪙</button>
+ <button data-upgrade="engine">⚡ Motor <span id="lv-engine">0</span> · <span id="cost-engine">18</span>🪙</button>
+</div>
+<div id="controls">
+ <button data-key="ArrowLeft">◀ LINKS</button><button data-key="ArrowUp">▲ HOCH</button>
+ <button data-key="ArrowDown">▼ TIEF</button><button data-key="ArrowRight">RECHTS ▶</button>
+ <button data-key=" ">⚙ DRUCK</button>
+</div>
+<section id="startScreen" class="overlay">
+ <h1>🌊 OCEAN GATE</h1><h2>MISSION TITANIC · ULTIMATE EDITION</h2>
+ <p>Sammle Münzen, kaufe Upgrades und erreiche das Wrack in 3.800 Metern Tiefe. Ohne Verbesserungen hält dein Tauchboot dem Druck nicht stand. Achte auf Anglerfische, Kollisionen, Sauerstoff und Warnsignale.</p>
+ <button id="startButton">🚀 TAUCHGANG STARTEN</button>
+ <p class="note"><b>Steuerung:</b> ↓ / S = tiefer · ↑ / W = höher · ← → / A D = seitlich · Leertaste = Drucksystem kurzzeitig stabilisieren.<br>Auf Handy/Tablet funktionieren die Bildschirmtasten. Upgrades kannst du jederzeit während des Tauchgangs kaufen.</p>
+ <p class="note">Fiktives Arcade-Spiel. Keine realistische Simulation oder Aussage über die Sicherheit eines echten Tauchboots.</p>
+</section>
+<section id="endScreen" class="overlay hidden">
+ <h1 id="endTitle">MISSION BEENDET</h1><h2 id="endSubtitle"></h2><p id="endText"></p>
+ <button id="restartButton">🔄 NEUE MISSION</button>
+</section>
+<script>
+"use strict";
+(() => {
+const $=id=>document.getElementById(id);
+const canvas=$("game"),ctx=canvas.getContext("2d");
+let W=innerWidth,H=innerHeight,DPR=1;
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);canvas.style.width=W+"px";canvas.style.height=H+"px";ctx.setTransform(DPR,0,0,DPR,0,0);if(sub){sub.x=Math.max(65,Math.min(W-65,sub.x));sub.y=Math.max(175,Math.min(H-70,sub.y));}}
+const MAX_DEPTH=3800,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rand=(a,b)=>Math.random()*(b-a)+a;
+let sub={x:W/2,y:H*.62,vx:0,vy:0};
+let running=false,finished=false,last=0,elapsed=0,depth=0,pressure=1,hull=100,oxygen=100,oxygenMax=100,coins=0,stress=0;
+let fish=[],loot=[],bubbles=[],fishTimer=0,lootTimer=0,warningTimer=0,toastTimer=0,keys={},implosion=null;
+const levels={pressure:0,hull:0,oxygen:0,engine:0};
+const maxima={pressure:5,hull:4,oxygen:4,engine:3};
+const baseCosts={pressure:25,hull:20,oxygen:20,engine:18};
+const names={pressure:"Druckschutz",hull:"Rumpfverstärkung",oxygen:"Sauerstofftank",engine:"Motor"};
+function projectedDepth(){return Math.min(MAX_DEPTH,Math.round(650+levels.pressure*500+levels.hull*250+levels.oxygen*220+levels.engine*120));}
+function cost(k){return baseCosts[k]*(levels[k]+1);}
+function toast(msg){$("toast").textContent=msg;$("toast").classList.add("show");toastTimer=2.3;}
+function warn(msg,kind="warning"){const el=$("warning");el.textContent=msg;el.style.borderColor=kind==="danger"?"#ff5a5a":kind==="good"?"#4ce49a":"#ffb34d";el.style.color=kind==="danger"?"#ffb0a9":kind==="good"?"#aaffcf":"#ffe2a4";warningTimer=2.4;}
+function updateShop(){
+ for(const k of Object.keys(levels)){ $("lv-"+k).textContent=levels[k]+"/"+maxima[k];$("cost-"+k).textContent=levels[k]>=maxima[k]?"MAX":cost(k);const b=document.querySelector('[data-upgrade="'+k+'"]');b.disabled=levels[k]>=maxima[k]||coins<cost(k)||finished;}
+ $("shopTitle").textContent="WERKSTATT · "+coins+"🪙";
+ $("rangeText").textContent=projectedDepth().toLocaleString("de-DE")+" m / 3.800 m";
+ $("rangeFill").style.width=(projectedDepth()/MAX_DEPTH*100)+"%";
+}
+function buy(k){
+ if(finished)return;
+ if(!(k in levels))return;
+ if(levels[k]>=maxima[k]){toast("Dieses Upgrade ist bereits auf MAX.");return;}
+ const c=cost(k);if(coins<c){toast("Zu wenig Münzen! Sammle die goldenen Münzen.");return;}
+ coins-=c;levels[k]++;
+ if(k==="hull")hull=Math.min(100+levels.hull*18,hull+30);
+ if(k==="oxygen"){oxygenMax=100+levels.oxygen*25;oxygen=Math.min(oxygenMax,oxygen+35);}
+ updateShop();updateHUD();warn("✅ UPGRADE INSTALLIERT: "+names[k].toUpperCase(),"good");
+}
+document.querySelectorAll("[data-upgrade]").forEach(b=>b.addEventListener("click",()=>buy(b.dataset.upgrade)));
+function start(){if(running)return;$("startScreen").classList.add("hidden");running=true;last=performance.now();warn("TAUCHGANG GESTARTET – SYSTEME AKTIV","good");requestAnimationFrame(loop);}
+$("startButton").addEventListener("click",start);
+$("restartButton").addEventListener("click",()=>location.reload());
+addEventListener("keydown",e=>{keys[e.key]=true;if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();});
+addEventListener("keyup",e=>keys[e.key]=false);addEventListener("blur",()=>keys={});
+document.querySelectorAll("[data-key]").forEach(b=>{const k=b.dataset.key;b.addEventListener("pointerdown",e=>{e.preventDefault();keys[k]=true;b.setPointerCapture(e.pointerId);});["pointerup","pointercancel","lostpointercapture"].forEach(ev=>b.addEventListener(ev,()=>keys[k]=false));});
+addEventListener("resize",resize);
+function spawnFish(){
+ const left=Math.random()<.5,angler=Math.random()<.42;
+ fish.push({x:left?-75:W+75,y:rand(205,H-100),vx:left?rand(115,195):-rand(115,195),size:angler?rand(27,38):rand(19,30),phase:rand(0,6),angler,hp:1});
+}
+function spawnLoot(){loot.push({x:rand(60,W-60),y:rand(210,H-100),r:11,phase:rand(0,6),value:5});}
+function drawBackground(){
+ const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#0a4563");g.addColorStop(.42,"#052a46");g.addColorStop(1,"#010914");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ ctx.save();ctx.globalAlpha=.08;ctx.fillStyle="#83e5ff";for(let i=0;i<5;i++){ctx.beginPath();ctx.moveTo(W*(.08+i*.21),0);ctx.lineTo(W*(.17+i*.21),H);ctx.lineTo(W*(.12+i*.21),H);ctx.closePath();ctx.fill();}ctx.restore();
+ for(let i=0;i<55;i++){const x=(i*137+elapsed*8)%(W+20),y=(i*83+elapsed*13)%(H+20);ctx.fillStyle="rgba(170,225,240,.24)";ctx.fillRect(x,y,2,2);}
+}
+function drawFish(f){
+ ctx.save();ctx.translate(f.x,f.y);if(f.vx<0)ctx.scale(-1,1);
+ if(f.angler){
+  ctx.fillStyle="#101b22";ctx.beginPath();ctx.ellipse(0,0,f.size,f.size*.62,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#29363b";ctx.beginPath();ctx.moveTo(-f.size*.6,0);ctx.lineTo(-f.size*1.45,-f.size*.7);ctx.lineTo(-f.size*1.35,f.size*.7);ctx.closePath();ctx.fill();
+  ctx.strokeStyle="#b9d8c9";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(f.size*.25,-f.size*.4);ctx.quadraticCurveTo(f.size*.55,-f.size*1.2,f.size*.9,-f.size*.88);ctx.stroke();
+  ctx.shadowColor="#d8ff75";ctx.shadowBlur=16;ctx.fillStyle="#eaff88";ctx.beginPath();ctx.arc(f.size*.9,-f.size*.88,5,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  ctx.fillStyle="#ff423c";ctx.beginPath();ctx.arc(f.size*.5,-4,3.5,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#e5e9dc";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(f.size*.45,f.size*.35);ctx.lineTo(f.size*.95,f.size*.25);ctx.stroke();
+ }else{
+  ctx.fillStyle="#8db9a9";ctx.beginPath();ctx.ellipse(0,0,f.size,f.size*.48,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#527f79";ctx.beginPath();ctx.moveTo(-f.size*.65,0);ctx.lineTo(-f.size*1.35,-f.size*.55);ctx.lineTo(-f.size*1.3,f.size*.55);ctx.closePath();ctx.fill();
+  ctx.fillStyle="#e7f8ed";ctx.beginPath();ctx.arc(f.size*.55,-4,3,0,Math.PI*2);ctx.fill();
+ }
+ ctx.restore();
+}
+function drawCoin(c){ctx.save();ctx.translate(c.x,c.y+Math.sin(elapsed*4+c.phase)*5);ctx.shadowColor="#ffdc52";ctx.shadowBlur=15;ctx.fillStyle="#f5c842";ctx.beginPath();ctx.arc(0,0,c.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle="#fff0a1";ctx.lineWidth=2;ctx.stroke();ctx.fillStyle="#8a5b0a";ctx.font="bold 12px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("$",0,1);ctx.restore();}
+function drawSub(){
+ ctx.save();ctx.translate(sub.x,sub.y);
+ // Heckantrieb und Propeller
+ ctx.fillStyle="#9aaeb1";ctx.fillRect(-64,-10,17,20);ctx.fillStyle="#e4b72f";ctx.fillRect(-71,-17,8,34);
+ ctx.strokeStyle="#e9b92e";ctx.lineWidth=5;ctx.strokeRect(-56,-34,112,68);
+ ctx.strokeStyle="#a67b1b";ctx.lineWidth=2;ctx.strokeRect(-49,-27,98,54);
+ // langer weißer zylindrischer Druckkörper
+ const body=ctx.createLinearGradient(0,-18,0,18);body.addColorStop(0,"#fffef0");body.addColorStop(.48,"#c9d2d0");body.addColorStop(1,"#778c91");
+ ctx.fillStyle=body;ctx.beginPath();ctx.roundRect(-48,-16,89,32,15);ctx.fill();
+ // Front-Endkappe und dunkles Sichtfenster
+ ctx.fillStyle="#a8b5b2";ctx.beginPath();ctx.ellipse(39,0,10,16,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#092b43";ctx.beginPath();ctx.ellipse(43,0,6,10,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#e9c64e";ctx.lineWidth=2;ctx.stroke();
+ // Querstreben / gelber Rahmen
+ ctx.strokeStyle="#f3c43e";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-30,-32);ctx.lineTo(-30,32);ctx.moveTo(22,-32);ctx.lineTo(22,32);ctx.moveTo(-54,-24);ctx.lineTo(54,-24);ctx.moveTo(-54,24);ctx.lineTo(54,24);ctx.stroke();
+ // Thruster-Gondeln
+ for(const yy of [-26,26]){ctx.fillStyle="#263e49";ctx.fillRect(-9,yy-5,30,10);ctx.fillStyle="#e8bc35";ctx.fillRect(17,yy-7,8,14);}
+ ctx.fillStyle="#263e43";ctx.font="bold 7px Arial";ctx.fillText("TITAN", -19,3);
+ ctx.restore();
+}
+function drawWreck(){
+ const x=W*.53,y=Math.max(235,H*.43);ctx.save();ctx.translate(x,y);ctx.globalAlpha=.99;
+ // gewaltiger, zerbrochener Rumpf mit Decks
+ ctx.fillStyle="#4c6265";ctx.beginPath();ctx.moveTo(-Math.min(190,W*.34),-12);ctx.lineTo(Math.min(190,W*.34),-12);ctx.lineTo(Math.min(150,W*.28),25);ctx.lineTo(-Math.min(155,W*.29),25);ctx.closePath();ctx.fill();
+ ctx.fillStyle="#718184";ctx.fillRect(-105,-36,210,24);ctx.fillRect(-70,-55,145,19);ctx.fillRect(-35,-72,75,17);
+ // vier Schornsteine
+ for(let i=-3;i<=3;i+=2){ctx.fillStyle="#293c40";ctx.fillRect(i*24-7,-102,14,31);ctx.fillStyle="#b47b48";ctx.fillRect(i*24-7,-102,14,7);}
+ ctx.strokeStyle="#91a3a0";ctx.lineWidth=3;for(let i=-90;i<=90;i+=24){ctx.beginPath();ctx.moveTo(i,-12);ctx.lineTo(i+5,-48);ctx.stroke();}
+ ctx.fillStyle="#d9bd72";ctx.font="bold 18px Georgia";ctx.textAlign="center";ctx.fillText("TITANIC",0,58);
+ ctx.fillStyle="#d6e4df";ctx.font="11px Arial";ctx.fillText("WRACK · 3.800 M",0,76);
+ ctx.restore();
+}
+function draw(){
+ drawBackground();if(depth>MAX_DEPTH-1150)drawWreck();
+ bubbles.forEach(b=>{ctx.fillStyle="rgba(160,230,255,.48)";ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();});
+ loot.forEach(drawCoin);fish.forEach(drawFish);drawSub();
+ const vg=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.2,W/2,H/2,Math.max(W,H)*.75);vg.addColorStop(0,"transparent");vg.addColorStop(1,"rgba(0,0,0,.4)");ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+}
+function updateHUD(){
+ $("depth").textContent=Math.floor(depth).toLocaleString("de-DE")+" m";$("pressure").textContent=Math.floor(pressure).toLocaleString("de-DE")+" bar";$("coins").textContent=coins;
+ $("hull").textContent=Math.ceil(hull)+" %";$("oxygen").textContent=Math.ceil(oxygen)+" %";
+ $("depthBar").style.width=(depth/MAX_DEPTH*100)+"%";$("pressureBar").style.width=(pressure/381*100)+"%";$("hullBar").style.width=(hull/(100+levels.hull*18)*100)+"%";$("oxygenBar").style.width=(oxygen/oxygenMax*100)+"%";$("coinBar").style.width=(coins%100)+"%";
+ const critical=pressure>=(215+levels.pressure*28)||hull<40||oxygen<25;
+ $("status").textContent=critical?"WARNUNG":"STABIL";$("status").style.color=critical?"#ff8d68":"#7df2b0";$("statusBar").style.width=critical?"100%":"35%";$("statusBar").style.background=critical?"#ff625c":"#4ce49a";
+ updateShop();
+}
+function startImplosion(){
+ implosion={t:0,flash:1,parts:[],rings:[{r:8,a:1},{r:22,a:.9},{r:38,a:.7}]};
+ for(let i=0;i<190;i++){const a=Math.random()*Math.PI*2,s=rand(80,600);implosion.parts.push({x:sub.x,y:sub.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,size:rand(2,12),life:rand(1.2,3),color:["#f3c43e","#eef4ef","#819ba4","#47d9ff","#fff"][i%5]});}
+ implosion.showEndAt=performance.now()+4500;
+}
+function drawImplosion(dt){
+ if(!implosion)return;const p=implosion;p.t+=dt;ctx.save();ctx.fillStyle="rgba(0,4,15,.48)";ctx.fillRect(0,0,W,H);
+ if(p.flash>0){ctx.fillStyle="rgba(235,252,255,"+(p.flash*.88)+")";ctx.fillRect(0,0,W,H);p.flash=Math.max(0,p.flash-dt*2.2);}
+ p.rings.forEach(r=>{r.r+=650*dt;r.a-=.45*dt;if(r.a>0){ctx.beginPath();ctx.arc(sub.x,sub.y,r.r,0,Math.PI*2);ctx.strokeStyle="rgba(133,231,255,"+r.a+")";ctx.lineWidth=Math.max(2,17-r.r/40);ctx.stroke();}});
+ p.parts.forEach(q=>{q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=Math.pow(.3,dt);q.vy=Math.pow(.3,dt)*q.vy+90*dt;q.life-=dt;if(q.life>0){ctx.globalAlpha=Math.min(1,q.life);ctx.fillStyle=q.color;ctx.shadowColor=q.color;ctx.shadowBlur=15;ctx.save();ctx.translate(q.x,q.y);ctx.rotate(p.t*4);ctx.fillRect(-q.size,-q.size/2,q.size*2.5,q.size);ctx.restore();}});
+ ctx.restore();
+}
+function endGame(win,reason){
+ if(finished)return;finished=true;running=false;
+ if(!win&&reason==="IMPLOSION"){startImplosion();$("endTitle").textContent="💥 KATASTROPHALE IMPLOSION";$("endSubtitle").textContent="DRUCKKÖRPER VERSAGT";$("endText").textContent="Das Tauchboot wurde vom enormen Wasserdruck zerstört. Erreichte Tiefe: "+Math.floor(depth).toLocaleString("de-DE")+" m. Die Trümmeranimation läuft.";return;}
+ $("endTitle").textContent=win?"🏆 TITANIC GEFUNDEN!":"⚠️ MISSION GESCHEITERT";$("endSubtitle").textContent=reason;$("endText").textContent="Erreichte Tiefe: "+Math.floor(depth).toLocaleString("de-DE")+" m von 3.800 m. "+(win?"Das Wrack liegt vor dir. Mission erfüllt!":"Rüste dein Tauchboot besser aus und versuche es erneut.");$("endScreen").classList.remove("hidden");
+}
+function update(dt){
+ elapsed+=dt;
+ const down=keys.ArrowDown||keys.s||keys.S,up=keys.ArrowUp||keys.w||keys.W,left=keys.ArrowLeft||keys.a||keys.A,right=keys.ArrowRight||keys.d||keys.D,stabilize=keys[" "]||keys.e||keys.E;
+ const accel=300*(1+levels.engine*.28);
+ if(left)sub.vx-=accel*dt;if(right)sub.vx+=accel*dt;if(up)sub.vy-=250*dt;if(down)sub.vy+=250*dt;
+ sub.vx*=Math.pow(.04,dt);sub.vy*=Math.pow(.08,dt);sub.x=clamp(sub.x+sub.vx*dt,60,W-60);sub.y=clamp(sub.y+sub.vy*dt,175,H-70);
+ const diveRate=down?1.12:.42;if(up)depth=clamp(depth-.95*125*dt,0,MAX_DEPTH);else depth=clamp(depth+diveRate*125*dt,0,MAX_DEPTH);
+ pressure=1+depth/10;
+ const threshold=185+levels.pressure*38+levels.hull*13;
+ if(pressure>threshold&&!stabilize)stress+=(pressure-threshold)*(.014-levels.pressure*.0015)*dt;
+ else stress=Math.max(0,stress-(stabilize?42:7)*dt);
+ hull=clamp(hull-stress*.12*dt,0,100+levels.hull*18);
+ oxygen=clamp(oxygen-(.46+(down?.13:0)-levels.oxygen*.045)*dt,0,oxygenMax);
+ fishTimer+=dt;lootTimer+=dt;
+ if(fishTimer>Math.max(.62,1.25-levels.engine*.08)){spawnFish();fishTimer=0;}
+ if(lootTimer>2.3){spawnLoot();lootTimer=0;}
+ fish.forEach(f=>{
+  f.x+=f.vx*dt;f.y+=Math.sin(elapsed*3+f.phase)*18*dt;
+  if(Math.abs(f.x-sub.x)<f.size+27&&Math.abs(f.y-sub.y)<f.size*.65+18){
+   const damage=f.angler?26:11;hull=clamp(hull-damage*dt*2,0,100+levels.hull*18);
+   if(f.angler&&warningTimer<=0)warn("🚨 ANGLERFISCH-KONTAKT! SCHWERER RUMPF-SCHADEN!","danger");
+   else if(warningTimer<=0)warn("⚠️ KOLLISION – AUSWEICHEN!","warning");
+  }
+ });
+ fish=fish.filter(f=>f.x>-120&&f.x<W+120);
+ loot.forEach(c=>{if(Math.hypot(c.x-sub.x,c.y-sub.y)<34){coins+=c.value;c.collected=true;toast("+5 MÜNZEN – EINGESAMMELT!");}});
+ loot=loot.filter(c=>!c.collected);
+ if(Math.random()<.35)bubbles.push({x:rand(0,W),y:H+5,r:rand(1,3),speed:rand(25,75)});bubbles.forEach(b=>b.y-=b.speed*dt);bubbles=bubbles.filter(b=>b.y>-10);
+ if(warningTimer>0)warningTimer-=dt;
+ if(warningTimer<=0){
+  if(oxygen<25)warn("🚨 SAUERSTOFF KRITISCH – SCHNELL HANDELN!","danger");
+  else if(hull<40)warn("🚨 RUMPF BESCHÄDIGT – KOLLISIONEN VERMEIDEN!","danger");
+  else if(pressure>threshold)warn("⚠️ DRUCKGRENZE ÜBERSCHRITTEN – LEERTASTE HALTEN!","warning");
+  else if(stabilize)warn("DRUCKSYSTEM WIRD STABILISIERT","good");
+ }
+ updateHUD();
+ if(hull<=0)endGame(false,"IMPLOSION");
+ else if(oxygen<=0)endGame(false,"SAUERSTOFFVORRAT AUFGEBRAUCHT");
+ else if(depth>=MAX_DEPTH)endGame(true,"DAS TITANIC-WRACK IST ERREICHT");
+}
+function loop(now){
+ const dt=Math.min(Math.max((now-last)/1000,0),.04);last=now;
+ if(running){update(dt);draw();if(running)requestAnimationFrame(loop);else if(implosion)requestAnimationFrame(loop);}
+ else if(implosion){draw();drawImplosion(dt);if(now>=implosion.showEndAt){$("endScreen").classList.remove("hidden");implosion=null;}else requestAnimationFrame(loop);}
+}
+resize();updateHUD();draw();
+})();
+</script>
+</body></html>
